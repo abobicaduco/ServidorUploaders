@@ -203,56 +203,84 @@ def get_todas_pastas_raiz():
     return [d for d in os.listdir(BASE_PATH) if os.path.isdir(os.path.join(BASE_PATH, d)) and not d.startswith('_')]
 
 def ler_pastas_permitidas(username):
+    """
+    Lê a planilha UPLOADERS.xlsx e retorna a lista de pastas que o usuário tem permissão.
+    Suporta múltiplos usuários por linha e múltiplas pastas por linha (separados por , ou ;).
+    """
     pastas_permitidas = []
-    if username in ADMIN_USERS:
+    username_limpo = username.strip().lower()
+
+    if username_limpo in [u.lower() for u in ADMIN_USERS]:
         return ['ALL']
 
     if not os.path.exists(EXCEL_FILE):
+        logger.warning(f"Planilha de permissões não encontrada: {EXCEL_FILE}")
         return pastas_permitidas
         
     try:
+        import re
         df = pd.read_excel(EXCEL_FILE)
-        df['PASTA'] = df['PASTA'].astype(str)
-        df['USERS'] = df['USERS'].astype(str)
+        # Garantir que as colunas são tratadas como string e remover NaNs
+        df['PASTA'] = df['PASTA'].fillna('').astype(str)
+        df['USERS'] = df['USERS'].fillna('').astype(str)
         
         for index, row in df.iterrows():
-            usuarios_da_pasta = [u.strip().lower() for u in row['USERS'].split(',')]
-            if username.lower() in usuarios_da_pasta:
-                pastas_na_linha = [p.strip() for p in row['PASTA'].split(',')]
+            # Suporta separadores , ou ;
+            usuarios_na_linha = [u.strip().lower() for u in re.split(',|;', row['USERS']) if u.strip()]
+            
+            if username_limpo in usuarios_na_linha:
+                pastas_na_linha = [p.strip() for p in re.split(',|;', row['PASTA']) if p.strip()]
                 pastas_permitidas.extend(pastas_na_linha)
                 
-        if 'ALL' in [p.upper() for p in pastas_permitidas]:
+        # Se encontrou 'ALL' em qualquer lugar, libera tudo
+        if any(p.upper() == 'ALL' for p in pastas_permitidas):
             return ['ALL']
             
-        pastas_permitidas = list(set(pastas_permitidas))
+        # Remover duplicatas mantendo a ordem (opcional, mas set resolve)
+        pastas_permitidas = list(dict.fromkeys(pastas_permitidas))
+        
     except Exception as e:
-        logger.error(f"Erro ao processar a planilha de UPLOADERS: {e}")
+        logger.error(f"Erro crítico ao ler Excel {EXCEL_FILE}: {e}")
     
     return pastas_permitidas
 
 def mapear_diretorios_arquivos_input(pastas_permitidas):
+    """
+    Com base nas pastas permitidas, varre o disco procurando as subpastas 'arquivos_input'.
+    Retorna o dicionário agrupado para o frontend e o set de caminhos válidos para trava de segurança.
+    """
     grouped_diretorios = {}
     valid_paths = set()
     
-    if 'ALL' in [p.upper() for p in pastas_permitidas]:
+    # Se for ALL, pega todas as pastas reais no diretório automacoes
+    if any(p.upper() == 'ALL' for p in pastas_permitidas):
         pastas_permitidas = get_todas_pastas_raiz()
 
     for pasta_raiz in pastas_permitidas:
-        caminho_input = os.path.join(BASE_PATH, pasta_raiz, "arquivos_input")
+        caminho_base_pasta = os.path.join(BASE_PATH, pasta_raiz)
+        caminho_input = os.path.join(caminho_base_pasta, "arquivos_input")
+        
         if os.path.exists(caminho_input):
             if pasta_raiz not in grouped_diretorios:
                 grouped_diretorios[pasta_raiz] = {}
                 
             grouped_diretorios[pasta_raiz][caminho_input] = "arquivos_input (Raiz)"
-            valid_paths.add(caminho_input)
+            valid_paths.add(os.path.abspath(caminho_input))
             
+            # Varredura de subpastas dentro de arquivos_input
             for root, dirs, files in os.walk(caminho_input):
                 for d in dirs:
                     caminho_completo = os.path.join(root, d)
                     caminho_relativo = os.path.relpath(caminho_completo, start=caminho_input)
                     nome_exibicao = f"arquivos_input / {caminho_relativo.replace(os.sep, ' / ')}"
                     grouped_diretorios[pasta_raiz][caminho_completo] = nome_exibicao
-                    valid_paths.add(caminho_completo)
+                    valid_paths.add(os.path.abspath(caminho_completo))
+        else:
+            # LOG DE APOIO AO ADMINISTRADOR
+            if not os.path.exists(caminho_base_pasta):
+                logger.warning(f"Permissão negada ou Pasta não encontrada no disco: '{pasta_raiz}' (Caminho esperado: {caminho_base_pasta})")
+            else:
+                logger.info(f"Pasta '{pasta_raiz}' existe, mas não possui subpasta 'arquivos_input'. Ignorada no portal.")
                     
     return grouped_diretorios, valid_paths
 
