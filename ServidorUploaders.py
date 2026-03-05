@@ -264,17 +264,19 @@ def mapear_diretorios_arquivos_input(pastas_permitidas):
             if pasta_raiz not in grouped_diretorios:
                 grouped_diretorios[pasta_raiz] = {}
                 
-            grouped_diretorios[pasta_raiz][caminho_input] = "arquivos_input (Raiz)"
-            valid_paths.add(os.path.abspath(caminho_input))
+            caminho_input_abs = os.path.abspath(caminho_input)
+            grouped_diretorios[pasta_raiz][caminho_input_abs] = "arquivos_input (Raiz)"
+            valid_paths.add(caminho_input_abs)
             
             # Varredura de subpastas dentro de arquivos_input
             for root, dirs, files in os.walk(caminho_input):
                 for d in dirs:
                     caminho_completo = os.path.join(root, d)
+                    caminho_completo_abs = os.path.abspath(caminho_completo)
                     caminho_relativo = os.path.relpath(caminho_completo, start=caminho_input)
                     nome_exibicao = f"arquivos_input / {caminho_relativo.replace(os.sep, ' / ')}"
-                    grouped_diretorios[pasta_raiz][caminho_completo] = nome_exibicao
-                    valid_paths.add(os.path.abspath(caminho_completo))
+                    grouped_diretorios[pasta_raiz][caminho_completo_abs] = nome_exibicao
+                    valid_paths.add(caminho_completo_abs)
         else:
             # LOG DE APOIO AO ADMINISTRADOR
             if not os.path.exists(caminho_base_pasta):
@@ -336,14 +338,15 @@ def upload_ajax():
         return jsonify({"status": "error", "message": "Nenhum arquivo enviado."})
         
     file = request.files['file']
-    target_path = request.form.get('target_folder')
+    target_path_raw = request.form.get('target_folder', '')
+    target_path = os.path.abspath(target_path_raw) if target_path_raw else ""
     execution_mode = request.form.get('execution_mode', 'upload_run')
     
     if file.filename == '':
         return jsonify({"status": "error", "message": "Nome do arquivo vazio."})
         
     if target_path not in valid_paths:
-        return jsonify({"status": "error", "message": "Acesso negado a este diretório."})
+        return jsonify({"status": "error", "message": f"Acesso negado."})
         
     filename = secure_filename(file.filename)
     caminho_final = os.path.join(target_path, filename)
