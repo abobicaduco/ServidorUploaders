@@ -359,6 +359,11 @@ def upload_ajax():
 def stream_logs():
     """Endpoint SSE que executa o script e envia os logs em tempo real para a tela."""
     script_path = session.get('pending_script')
+    username_logado = session.get('username', 'desconhecido')
+    
+    # Limpa o script da sessão imediatamente para evitar re-execução em refresh
+    # e para evitar erros de contexto dentro do gerador
+    session.pop('pending_script', None)
     
     if not script_path or not os.path.exists(script_path):
         def error_gen():
@@ -381,7 +386,6 @@ def stream_logs():
             # Identifica que a execução foi iniciada via botão pelo usuário na tela
             current_env['ENV_EXEC_MODE'] = 'SOLICITACAO'
             # Passa o nome do usuário que apertou o botão (email do C6)
-            username_logado = session.get('username', 'desconhecido')
             current_env['ENV_EXEC_USER'] = f"{username_logado}@c6bank.com"
             
             # Executa passando o novo "env" clonado e injetado com as métricas
@@ -411,9 +415,6 @@ def stream_logs():
         except Exception as e:
             logger.error(f"Falha crítica ao iniciar processo de automação: {str(e)}")
             yield f"data: [ERRO_INTERNO] Falha ao iniciar processo: {str(e)}\n\n"
-        finally:
-            # Limpa o script da sessão por segurança
-            session.pop('pending_script', None)
 
     return Response(generate(), mimetype='text/event-stream')
 
