@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C6 Bank - Célula Python Monitoração</title>
+    <!-- O script do Tailwind abaixo NÃO exige Node.js, ele baixar o CSS dinâmico no navegador -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    },
+                    colors: {
+                        c6black: '#242424',
+                        c6dark: '#1A1A1A',
+                        c6yellow: '#d3ad65',
+                        c6yellowHover: '#e6c888',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 1);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        select option {
+            padding: 10px;
+        }
+
+        select optgroup {
+            font-weight: 700;
+            color: #242424;
+            background: #f3f4f6;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #d3ad65;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .terminal-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal-scroll::-webkit-scrollbar-track {
+            background: #1A1A1A;
+        }
+
+        .terminal-scroll::-webkit-scrollbar-thumb {
+            background: #4a4a4a;
+            border-radius: 4px;
+        }
+
+        .terminal-scroll::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col min-h-screen text-gray-800 antialiased">
+
+    <header class="bg-c6dark shadow-lg border-b border-gray-800 relative z-10">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <div class="flex items-center gap-4">
+                    <div
+                        class="flex items-center justify-center w-12 h-12 bg-c6black border-2 border-c6yellow rounded-lg shadow-md">
+                        <span class="text-c6yellow font-bold text-xl tracking-tighter">C6</span>
+                    </div>
+                    <div>
+                        <h1 class="text-white text-lg font-semibold tracking-wide">Mensageria e Cargas Operacionais</h1>
+                        <p class="text-c6yellow text-xs font-medium uppercase tracking-widest mt-0.5">Célula Python
+                            Monitoração</p>
+                    </div>
+                </div>
+
+                {% if username %}
+                <div class="flex items-center gap-5">
+                    <a href="mailto:carlos.lsilva@c6bank.com?subject=Suporte%20-%20Portal%20de%20Mensageria"
+                        class="hidden sm:flex items-center justify-center bg-gray-800 hover:bg-c6yellow text-gray-300 hover:text-c6black transition-colors px-3 py-2 rounded-lg text-sm font-medium shadow"
+                        title="Contatar Carlos Silva">
+                        <i class="fas fa-envelope mr-2"></i> Contato
+                    </a>
+                    <div class="hidden sm:block text-right">
+                        <p class="text-sm text-gray-300">Conectado como</p>
+                        <p class="text-white font-medium text-sm">
+                            <i class="fas fa-user-circle text-c6yellow mr-1"></i> {{ username }}
+                            {% if is_admin %}<span
+                                class="ml-2 bg-c6yellow text-c6dark text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Admin</span>{%
+                            endif %}
+                        </p>
+                    </div>
+                    <a href="{{ url_for('logout') }}"
+                        class="flex items-center justify-center bg-gray-800 hover:bg-red-600 text-gray-300 hover:text-white transition-colors h-10 w-10 rounded-full shadow"
+                        title="Sair">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex items-center justify-center p-4 sm:p-8 relative">
+        <div class="absolute inset-0 z-0 opacity-5 pointer-events-none"
+            style="background-image: radial-gradient(#242424 1px, transparent 1px); background-size: 20px 20px;"></div>
+
+        <div class="glass-card p-6 sm:p-10 w-full max-w-3xl relative z-10" id="main-card">
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="mb-6 space-y-3" id="flash-messages">
+                {% for category, message in messages %}
+                <div class="flex items-center p-4 rounded-lg border-l-4 shadow-sm {% if category == 'error' %}bg-red-50 border-red-500 text-red-700{% elif category == 'success' %}bg-green-50 border-green-500 text-green-700{% else %}bg-blue-50 border-blue-500 text-blue-700{% endif %}"
+                    role="alert">
+                    <span class="font-medium text-sm">{{ message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {% if state == 'login' %}
+            <!-- Tela de Login -->
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                    <i class="fas fa-shield-alt text-2xl text-c6black"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900">Acesso Restrito</h2>
+                <p class="text-gray-500 text-sm mt-2 max-w-sm mx-auto">Autentique-se com seu usuário de rede para
+                    receber o Token via e-mail corporativo.</p>
+            </div>
+            <form action="{{ url_for('request_token') }}" method="POST" class="space-y-6 max-w-sm mx-auto">
+                <div
+                    class="flex shadow-sm rounded-md ring-1 ring-inset ring-gray-300 focus-within:ring-2 focus-within:ring-c6yellow">
+                    <span class="flex items-center pl-3 pr-2 text-gray-400 sm:text-sm"><i
+                            class="fas fa-user"></i></span>
+                    <input type="text" name="username" placeholder="nome.sobrenome" required
+                        class="block flex-1 border-0 bg-transparent py-3 pl-1 text-gray-900 focus:ring-0 sm:text-sm font-medium">
+                    <span
+                        class="flex items-center pr-3 text-gray-500 sm:text-sm font-medium bg-gray-50 rounded-r-md border-l border-gray-200 px-3">@c6bank.com</span>
+                </div>
+                <button type="submit"
+                    class="w-full bg-c6black hover:bg-gray-800 text-c6yellow font-bold py-3 px-4 rounded-md shadow-lg transition-all flex justify-center items-center gap-2">
+                    <span>Solicitar Token</span> <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+
+            {% elif state == 'verify' %}
+            <!-- Tela de Verificação -->
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-50 mb-4">
+                    <i class="fas fa-envelope-open-text text-2xl text-yellow-600"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900">Verificação em Duas Etapas</h2>
+                <p class="text-gray-500 text-sm mt-2 max-w-sm mx-auto">Enviamos um código numérico de 6 dígitos para o
+                    seu Outlook.</p>
+            </div>
+            <form action="{{ url_for('verify_token') }}" method="POST" class="space-y-6 max-w-sm mx-auto">
+                <input type="hidden" name="username" value="{{ username }}">
+                <input type="text" name="token" maxlength="6" required autocomplete="off" placeholder="------"
+                    class="block w-full text-center tracking-[1em] text-3xl px-4 py-3 border-2 border-gray-300 rounded-lg shadow-sm focus:ring-0 focus:border-c6yellow font-bold text-gray-800">
+                <button type="submit"
+                    class="w-full bg-c6black hover:bg-gray-800 text-c6yellow font-bold py-3 px-4 rounded-md shadow-lg transition-all flex justify-center items-center gap-2">
+                    <span>Autenticar</span> <i class="fas fa-lock-open"></i>
+                </button>
+            </form>
+
+            {% elif state == 'upload' %}
+            <!-- Tela de Upload -->
+            <div id="upload-section">
+                <div class="mb-6 border-b border-gray-200 pb-5 text-center sm:text-left">
+                    <h2 class="text-2xl font-bold text-gray-900">Painel de Cargas e Orquestração</h2>
+                    <p class="text-gray-500 text-sm mt-1">Envie arquivos e acione os robôs (RPA) automaticamente.</p>
+                </div>
+
+                {% if diretorios %}
+                <form id="uploadForm" class="space-y-6">
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                            <i class="fas fa-folder-tree text-c6yellow text-lg"></i> 1. Pasta Alvo da Automação
+                        </label>
+                        <select name="target_folder" id="folder-select" required
+                            class="block w-full px-3 py-3 text-base border-gray-300 focus:ring-c6yellow focus:border-c6yellow sm:text-sm rounded-md shadow-sm bg-white font-medium text-gray-700">
+                            <option value="" disabled selected>-- Escolha o processo / diretório --</option>
+                            {% for root_name, subpastas in diretorios.items() %}
+                            <optgroup label="📂 {{ root_name }}">
+                                {% for caminho_absoluto, nome_exibicao in subpastas.items() %}
+                                <option value="{{ caminho_absoluto }}">↳ {{ nome_exibicao }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                            <i class="fas fa-file-upload text-c6yellow text-lg"></i> 2. Arquivo Input
+                        </label>
+                        <div id="drop-zone"
+                            class="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-dashed border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer group bg-white">
+                            <div class="space-y-2 text-center">
+                                <i
+                                    class="fas fa-cloud-upload-alt text-4xl text-gray-400 group-hover:text-c6yellow transition-colors"></i>
+                                <div class="flex text-sm text-gray-600 justify-center">
+                                    <span class="relative font-medium text-c6black hover:text-c6yellow">
+                                        <span>Clique para anexar</span>
+                                        <input id="file-upload" name="file" type="file" class="sr-only" required>
+                                    </span>
+                                    <p class="pl-1">ou arraste e solte</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="file-display"
+                            class="hidden mt-3 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between shadow-sm">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <i class="fas fa-file-alt text-green-600 text-2xl"></i>
+                                <div class="truncate">
+                                    <p id="file-name" class="text-sm font-bold text-green-800 truncate"></p>
+                                </div>
+                            </div>
+                            <button type="button" id="remove-file"
+                                class="ml-4 text-green-700 hover:text-red-600 bg-green-100 p-2 rounded-full">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" id="submit-btn"
+                            class="w-full bg-c6black hover:bg-gray-800 text-c6yellow font-bold py-3.5 px-4 rounded-md shadow-lg transition-all flex justify-center items-center gap-2 opacity-50 cursor-not-allowed"
+                            disabled>
+                            <span id="btn-text">Iniciar Processamento</span>
+                            <i id="btn-icon" class="fas fa-cogs"></i>
+                            <div id="btn-loader" class="loader hidden"></div>
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="text-center p-8 bg-red-50 border border-red-200 rounded-lg">
+                    <i class="fas fa-lock text-4xl text-red-400 mb-4"></i>
+                    <h3 class="text-lg font-bold text-red-800">Acesso Negado</h3>
+                    <p class="text-sm text-red-600 mt-2">Seu usuário não possui acesso configurado na Planilha Mestra.
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div id="missing-script-section" class="hidden text-center py-6">
+                <!-- Seção caso o script não seja encontrado -->
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-yellow-100 mb-6">
+                    <i class="fas fa-robot text-4xl text-yellow-600"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-2">Arquivo Salvo, mas...</h3>
+                <p class="text-gray-600 mb-6 max-w-md mx-auto">O upload do arquivo foi concluído com sucesso na pasta
+                    selecionada, no entanto, o sistema <b>não encontrou um script de automação</b> vinculado a ela
+                    (<i><span id="missing-script-name" class="font-mono text-sm bg-gray-100 px-1 rounded"></span></i>).
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button onclick="location.reload()"
+                        class="px-6 py-2 border-2 border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition-colors">Voltar</button>
+
+                    <a id="btn-contato"
+                        href="mailto:carlos.lsilva@c6bank.com?subject=Solicitação de Verificação - Script de Automação Faltante"
+                        class="px-6 py-2 bg-c6black text-c6yellow font-bold rounded-lg shadow-md hover:bg-gray-800 transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-envelope"></i> Contatar Carlos Silva
+                    </a>
+                </div>
+            </div>
+
+            <div id="terminal-section" class="hidden">
+                <!-- Seção do Terminal -->
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <i class="fas fa-terminal text-c6yellow bg-c6black p-2 rounded-md"></i> Monitor de Execução
+                    </h3>
+                    <span class="animate-pulse flex items-center gap-2 text-sm font-bold text-green-600"
+                        id="status-running">
+                        <span class="w-2.5 h-2.5 bg-green-500 rounded-full"></span> Rodando Automação...
+                    </span>
+                </div>
+
+                <div class="rounded-lg shadow-2xl overflow-hidden border border-gray-700 bg-c6dark">
+                    <div class="bg-gray-900 px-4 py-2 flex items-center justify-between border-b border-gray-800">
+                        <div class="flex gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500 opacity-80"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500 opacity-80"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500 opacity-80"></div>
+                        </div>
+                        <span class="text-gray-400 text-xs font-mono font-medium" id="terminal-title">python <span
+                                id="running-script-name"></span></span>
+                    </div>
+
+                    <div class="p-4 h-80 overflow-y-auto font-mono text-sm terminal-scroll bg-c6dark text-gray-300 leading-relaxed"
+                        id="terminal-output">
+                        <!-- Logs injectados aqui -->
+                    </div>
+                </div>
+
+                <div class="mt-6 text-center hidden" id="terminal-actions">
+                    <button onclick="location.reload()"
+                        class="bg-c6black hover:bg-gray-800 text-c6yellow font-bold py-3 px-8 rounded-lg shadow-lg transition-all flex justify-center items-center gap-2 mx-auto">
+                        <i class="fas fa-undo"></i> Realizar Novo Processo
+                    </button>
+                </div>
+            </div>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const uploadForm = document.getElementById('uploadForm');
+                    const dropZone = document.getElementById('drop-zone');
+
+                    if (uploadForm && dropZone) {
+                        const fileInput = document.getElementById('file-upload');
+                        const fileDisplay = document.getElementById('file-display');
+                        const fileName = document.getElementById('file-name');
+                        const removeBtn = document.getElementById('remove-file');
+                        const submitBtn = document.getElementById('submit-btn');
+                        const folderSelect = document.getElementById('folder-select');
+
+                        function checkFormValidity() {
+                            if (fileInput.files.length > 0 && folderSelect.value !== "") {
+                                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                                submitBtn.disabled = false;
+                            } else {
+                                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                                submitBtn.disabled = true;
+                            }
+                        }
+
+                        function handleFile(files) {
+                            if (files.length > 0) {
+                                fileInput.files = files;
+                                fileName.textContent = files[0].name;
+                                dropZone.classList.add('hidden');
+                                fileDisplay.classList.remove('hidden');
+                                fileDisplay.classList.add('flex');
+                                checkFormValidity();
+                            }
+                        }
+
+                        dropZone.addEventListener('click', () => fileInput.click());
+                        fileInput.addEventListener('change', function () { handleFile(this.files); });
+                        folderSelect.addEventListener('change', checkFormValidity);
+
+                        removeBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            fileInput.value = '';
+                            dropZone.classList.remove('hidden');
+                            fileDisplay.classList.add('hidden');
+                            fileDisplay.classList.remove('flex');
+                            checkFormValidity();
+                        });
+
+                        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
+                        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.add('border-c6yellow', 'bg-yellow-50')));
+                        ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('border-c6yellow', 'bg-yellow-50')));
+                        dropZone.addEventListener('drop', e => handleFile(e.dataTransfer.files));
+
+                        const sectionUpload = document.getElementById('upload-section');
+                        const sectionMissing = document.getElementById('missing-script-section');
+                        const sectionTerminal = document.getElementById('terminal-section');
+                        const terminalOutput = document.getElementById('terminal-output');
+
+                        uploadForm.addEventListener('submit', async (e) => {
+                            e.preventDefault();
+
+                            document.getElementById('btn-text').textContent = 'Processando...';
+                            document.getElementById('btn-icon').classList.add('hidden');
+                            document.getElementById('btn-loader').classList.remove('hidden');
+                            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                            submitBtn.disabled = true;
+
+                            const formData = new FormData(uploadForm);
+
+                            try {
+                                const response = await fetch('{{ url_for("upload_ajax") }}', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+                                const data = await response.json();
+
+                                const flashMsgs = document.getElementById('flash-messages');
+                                if (flashMsgs) flashMsgs.style.display = 'none';
+
+                                if (data.status === 'error') {
+                                    alert('Erro: ' + data.message);
+                                    location.reload();
+                                    return;
+                                }
+
+                                sectionUpload.classList.add('hidden');
+
+                                if (data.script_exists === false) {
+                                    document.getElementById('missing-script-name').textContent = data.folder_name + '.py';
+                                    const btnContato = document.getElementById('btn-contato');
+                                    btnContato.href = `mailto:carlos.lsilva@c6bank.com?subject=Aviso: Script Ausente - ${data.folder_name}&body=Olá Carlos,%0D%0A%0D%0AFiz o upload na pasta "${data.folder_name}", porém o sistema informou que não encontrou o script Python associado na pasta metodos.%0D%0A%0D%0APoderia verificar?`;
+                                    sectionMissing.classList.remove('hidden');
+
+                                } else {
+                                    document.getElementById('running-script-name').textContent = data.script_name;
+                                    sectionTerminal.classList.remove('hidden');
+                                    document.getElementById('main-card').classList.replace('max-w-3xl', 'max-w-5xl');
+
+                                    const eventSource = new EventSource("{{ url_for('stream_logs') }}");
+
+                                    eventSource.onmessage = function (event) {
+                                        if (event.data.includes('[CONCLUIDO_SUCESSO]')) {
+                                            appendLog("=====================================", 'text-green-500 font-bold');
+                                            appendLog("✅ PROCESSO FINALIZADO COM SUCESSO!", 'text-green-500 font-bold');
+                                            finishTerminal();
+                                            eventSource.close();
+                                            return;
+                                        }
+                                        if (event.data.includes('[CONCLUIDO_ERRO]')) {
+                                            appendLog("=====================================", 'text-red-500 font-bold');
+                                            appendLog("❌ " + event.data.replace('[CONCLUIDO_ERRO]', ''), 'text-red-500 font-bold');
+                                            finishTerminal(true);
+                                            eventSource.close();
+                                            return;
+                                        }
+                                        if (event.data.includes('[ERRO_INTERNO]')) {
+                                            appendLog("⚠️ ERRO CRÍTICO DO SERVIDOR: " + event.data.replace('[ERRO_INTERNO]', ''), 'text-red-500 font-bold bg-red-900 bg-opacity-20 p-1');
+                                            finishTerminal(true);
+                                            eventSource.close();
+                                            return;
+                                        }
+
+                                        appendLog(event.data);
+                                    };
+
+                                    eventSource.onerror = function (err) {
+                                        appendLog("Conexão com o console perdida.", "text-yellow-500");
+                                        finishTerminal(true);
+                                        eventSource.close();
+                                    };
+                                }
+
+                            } catch (error) {
+                                alert("Falha na comunicação com o servidor.");
+                                location.reload();
+                            }
+                        });
+
+                        function appendLog(text, customClasses = "") {
+                            const line = document.createElement('div');
+                            line.textContent = "> " + text;
+                            line.className = "mb-1 break-all " + customClasses;
+
+                            if (text.toLowerCase().includes('error') || text.toLowerCase().includes('traceback')) {
+                                line.classList.add('text-red-400');
+                            } else if (text.toLowerCase().includes('warning')) {
+                                line.classList.add('text-yellow-400');
+                            }
+
+                            terminalOutput.appendChild(line);
+                            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                        }
+
+                        function finishTerminal(hasError = false) {
+                            const statusText = document.getElementById('status-running');
+                            statusText.classList.remove('animate-pulse', 'text-green-600');
+                            if (hasError) {
+                                statusText.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Finalizado com Erros';
+                                statusText.classList.add('text-red-500');
+                            } else {
+                                statusText.innerHTML = '<i class="fas fa-check-double"></i> Concluído';
+                                statusText.classList.add('text-c6yellow');
+                            }
+                            document.getElementById('terminal-actions').classList.remove('hidden');
+                        }
+                    }
+                });
+            </script>
+            {% endif %}
+        </div>
+    </main>
+
+    <footer class="bg-c6dark border-t border-gray-800 py-6 text-center relative z-10">
+        <p class="text-xs text-gray-400 font-medium tracking-wide">
+            © 2024 BANCO C6 S.A. <span class="mx-2 text-gray-600">|</span>
+            <i class="fas fa-code text-c6yellow mx-1"></i> Orquestrador Célula Python
+        </p>
+    </footer>
+
+</body>
+
+</html>
