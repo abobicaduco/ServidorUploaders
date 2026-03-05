@@ -259,6 +259,45 @@
                         </div>
                     </div>
 
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <label class="block text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                            <i class="fas fa-play-circle text-c6yellow text-lg"></i> 3. Modo de Operação
+                        </label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <label
+                                class="relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none border-gray-300 has-[:checked]:border-c6yellow has-[:checked]:ring-1 has-[:checked]:ring-c6yellow">
+                                <input type="radio" name="execution_mode" value="upload_run" class="sr-only" checked>
+                                <div class="flex flex-1">
+                                    <div class="flex flex-col">
+                                        <span
+                                            class="block text-sm font-bold text-gray-900 border-b border-transparent [.has-\[:checked\]_&]:border-c6yellow pb-1 w-fit mb-1">Upload
+                                            e Executar</span>
+                                        <span class="flex items-center text-[11px] text-gray-500 leading-tight">Salva o
+                                            arquivo e inicia a automação imediatamente.</span>
+                                    </div>
+                                </div>
+                                <i
+                                    class="fas fa-check-circle text-c6yellow opacity-0 [.has-\[:checked\]_&]:opacity-100 transition-opacity self-center ml-2"></i>
+                            </label>
+
+                            <label
+                                class="relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none border-gray-300 has-[:checked]:border-c6yellow has-[:checked]:ring-1 has-[:checked]:ring-c6yellow">
+                                <input type="radio" name="execution_mode" value="upload_only" class="sr-only">
+                                <div class="flex flex-1">
+                                    <div class="flex flex-col">
+                                        <span
+                                            class="block text-sm font-bold text-gray-900 border-b border-transparent [.has-\[:checked\]_&]:border-c6yellow pb-1 w-fit mb-1">Apenas
+                                            Upload</span>
+                                        <span class="flex items-center text-[11px] text-gray-500 leading-tight">Apenas
+                                            salva o arquivo na pasta, sem rodar o Python.</span>
+                                    </div>
+                                </div>
+                                <i
+                                    class="fas fa-check-circle text-c6yellow opacity-0 [.has-\[:checked\]_&]:opacity-100 transition-opacity self-center ml-2"></i>
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="pt-2">
                         <button type="submit" id="submit-btn"
                             class="w-full bg-c6black hover:bg-gray-800 text-c6yellow font-bold py-3.5 px-4 rounded-md shadow-lg transition-all flex justify-center items-center gap-2 opacity-50 cursor-not-allowed"
@@ -277,6 +316,23 @@
                     </p>
                 </div>
                 {% endif %}
+            </div>
+
+            <div id="upload-success-section" class="hidden text-center py-6">
+                <!-- Seção de Sucesso Apenas Upload -->
+                <div
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-6 font-bold text-green-600">
+                    <i class="fas fa-check text-4xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-2">Upload Concluído!</h3>
+                <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                    O arquivo <b id="success-file-name" class="text-c6black"></b> foi salvo com sucesso no diretório de
+                    rede.
+                </p>
+                <button onclick="location.reload()"
+                    class="bg-c6black hover:bg-gray-800 text-c6yellow font-bold py-3 px-8 rounded-lg shadow-lg transition-all flex justify-center items-center gap-2 mx-auto">
+                    <i class="fas fa-arrow-left"></i> Voltar ao Início
+                </button>
             </div>
 
             <div id="missing-script-section" class="hidden text-center py-6">
@@ -420,6 +476,13 @@
                                 if (data.status === 'error') {
                                     alert('Erro: ' + data.message);
                                     location.reload();
+                                    return;
+                                }
+
+                                if (data.execution_mode === 'upload_only') {
+                                    sectionUpload.classList.add('hidden');
+                                    document.getElementById('upload-success-section').classList.remove('hidden');
+                                    document.getElementById('success-file-name').textContent = data.file_saved;
                                     return;
                                 }
 
